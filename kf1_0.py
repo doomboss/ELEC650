@@ -21,12 +21,14 @@ class kalmanFilter:
 		self.KFangleY = float(0.0)
 		self.KFangleZ = float(0.0)
 
-    #Y filter call
+
+#Y filter call
 	#accAngle = angle measured with atan2 using the accelerometer
 	#gyroRate = angle measured using the gyroRate
 	#looptime = loop time in millis()
 	def Y(self, accAngle, gyroRate, looptime):
-	
+		accAngle = anglecorrection(accAngle)
+		#gyroRate = anglecorrection(gyroRate)
 		#turns milliseconds into seconds
 		DT = float(float(looptime)/1000)
 	
@@ -69,7 +71,9 @@ class kalmanFilter:
 
     #X filter call
 	def X(self, accAngle, gyroRate, looptime):
-	
+		accAngle = anglecorrection(accAngle)
+                #gyroRate = anglecorrection(gyroRate)
+
 		DT = float(float(looptime)/1000)	
 	
 		self.KFangleX += + DT * (gyroRate - self.x_bias)
@@ -99,7 +103,8 @@ class kalmanFilter:
 
 	#for z
 	def Z(self, accAngle, gyroRate, looptime):
-	
+		accAngle = anglecorrection(accAngle)
+                #gyroRate = anglecorrection(gyroRate)	
 		#turns milliseconds into seconds
 		DT = float(float(looptime)/1000)
 	
@@ -141,16 +146,22 @@ class kalmanFilter:
 		return self.KFangleZ
 
 def AAX(accx, accy, accz):
-	return math.degrees(math.atan2(accy,accz))#i know this one is right
+	return math.degrees(math.atan2(accy,accz)+3.14)#i know this one is right
 
 def AAZ(accx, accy, accz):
-	return math.degrees(math.atan2(accx,accy)) #x and y might have to be switched
+	return math.degrees(math.atan2(accx,accy)+3.14) #x and y might have to be switched
 
 def AAY(accx, accy, accz):
-	return math.degrees(math.atan2(accz,accx)) #z and x might have to be switched
+	return math.degrees(math.atan2(accz,accx)+3.14) #z and x might have to be switched
 
-
-	
+def anglecorrection(angle):
+	#if angle > 180:
+	#    angle -= 360
+        #return float(angle)
+	if angle > 0:
+	    return (angle)
+	else:
+	    return (180)
 		
 def main():
 	#set up graph stuff

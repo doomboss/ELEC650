@@ -7,7 +7,7 @@
 #4. Connect the I2C device and detect it using the command "i2cdetect -y 1".  It should show up as 1D or 1E (here the variable LSM is set to 1D).
 
 #Driver by Fayetteville Free Library Robotics Group
-import DWLkf1_0 as kf
+import kf1_0 as kf
 import math
 import time
 import datetime
@@ -21,7 +21,6 @@ gyoxangle=0
 gyoyangle=0
 gyozangle=0
 
-magtranslate=0.160 #+-4gauss
 G_GAIN = 0.00875
 
 kalman = kf.kalmanFilter()
@@ -34,7 +33,7 @@ acctranslate=16383.8/(4*9.80665) #8g converted to m/s^2
 
 RAD_TO_DEG = 57.29578 
 M_PI = 3.14159265358979323846 # Pi value
-DT = 100 #derivative of time, 100ms, using it for the kalman filter
+DT = 10 #derivative of time, 20ms, using it for the kalman filter
 
 threshold=0.02
 
@@ -179,25 +178,14 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
     gyox = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB))
     gyoy = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB))
     gyoz = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))  
-  
-#    gyoxangle += gyox*DT/1000
-#    gyoyangle += gyoy*DT/1000
-#    gyozangle += gyoz*DT/1000
+    gyoxangle = DT/1000*gyox
+    gyoyangle = DT/1000*gyoy
+    gyozangle = DT/1000*gyoz
     #print "Gyroscope (x, y, z):", gyox, gyoy, gyoz
 
-    magx = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
-    magy = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
-    magz = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
-
-    #compass w/o pitch and roll
-    if (magy > 0):
-        com_deg2 = (90-(math.degrees(math.atan(magx/magy))))
-    if (magy < 0):
-        com_deg2 = (270-(math.degrees(math.atan(magx/magy))))
-    if (magy ==  0 and magx < 0):
-        com_deg2 = 180
-    if (magy == 0 and magx > 0):
-        com_deg2 = 0
+    magx = twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
+    magy = twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
+    magz = twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
 
     #print "Magnetic field (x, y, z):", magx, magy, magz
 
@@ -233,13 +221,6 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
     #print("AAX AAY AAZ ", aax, aay, aaz)
    # print("Kalman angles ", KangleX,",", KangleY,",", KangleZ)
 
-
-    #complementary filter for the gyroscope
-    #Current angle = 98% x (current angle + gyro rotation rate) + (2% * Accelerometer)
-    gyoxangle = 0.98*(gyoxangle+gyox*(DT/1000)) + 0.02*aax
-    gyoyangle = 0.98*(gyoyangle+gyoy*(DT/1000)) + 0.02*aay
-    gyozangle = 0.98*(gyozangle+gyoz*(DT/1000)) + 0.02*aaz
-
 #    temperature = twos_comp_combine(b.read_byte_data(LSM, TEMP_MSB), b.read_byte_data(LSM, TEMP_LSB))
 #    print "Temperature Reading: ", temperature
 
@@ -249,15 +230,13 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
 
     
 
-    if(counter==50):
-	print "Acceleration (x, y, z):", accx, accy, accz
-        print "Distance estimation in meter: ", math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))
+    if(counter==20):
+	#print "Acceleration (x, y, z):", accx, accy, accz
+        #print "Distance estimation in meter: ", math.sqrt(math.pow(accx-oaccx,2)+math.pow(accy-oaccy,2))
 	print "Time spent: ", time.time() - timer
-	print "Gyroscope angle(x, y, z):", gyoxangle, gyoyangle, gyozangle
-	print "Gyroscope rate(x, y, z):", gyox, gyoy, gyoz
+	print "Gyroscope(x, y, z):", gyox, gyoy, gyoz
 
-	print "Magnetic field Raw Reading(x, y, z):", magx, magy, magz
-        print "Degree: %.2f" % com_deg2
+	#print "Magnetic field (x, y, z):", magx, magy, magz
 
         print("AAX AAY AAZ ", aax, aay, aaz)
 	print("Kalman angles ", KangleX,",", KangleY,",", KangleZ)
