@@ -177,7 +177,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	#start graph
 	
 	#plt.suptitle("calibration routine")
-	graph_init()
+	#graph_init()
 	
 	#setup timers
 	timer_mark = float(kf.getTimer_Mark()) #this is time since start of program
@@ -238,7 +238,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
 		
 		#calibration graph
-		graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
+		#graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
 	
 	#calibration completed, orientation should be correct
 	#important!!! setting gravity should only happen once
@@ -258,7 +258,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	print("sleeping")
 	time.sleep(3) #remove this later
 	print("clearing graph")
-	plt.clf() #clears figure
+	#plt.clf() #clears figure
 	return kf
 	
 	
@@ -348,10 +348,12 @@ def output_console(i, delta_t, time_since_start,gyox,gyoy,gyoz,aax,aay,aaz,Kangl
 	print("delta_t: ", delta_t, "time_since_start: ", time_since_start)
 	return
 
-def removeG(a, g):
-	a[0] = a[0] - g[0]
-	a[1] = a[1] - g[1]
-	a[2] = a[2] - g[2]
+def removeG(a, g): #i modified this part to only change X and Y, Z remains unchanged because it is just gravity...
+	if not a[0]==0: 
+	    a[0] = a[0] - g[0]
+	if not a[1]==0:
+	    a[1] = a[1] - g[1]
+	#a[2] = a[2] - g[2]
 	return a
 	
 

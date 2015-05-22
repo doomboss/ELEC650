@@ -166,6 +166,11 @@ else:
     velocity = 0
     displacement = 0
 
+    #calibrate the filter first
+
+    kalman = kf.calibrate_filter(kalman)
+
+
 while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LSM_GYO, 0x0f) == LSM_WHOAMI_L3GD20H):
     
     #getting the initial value of accleration first
@@ -225,10 +230,8 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
     #KangleZ = kalman.Z(aaz, gyoz, delta_t) #gets calculated y
     #print("Kalman angles " +KangleX+","+KangleY+","+KangleX)
 
-    #print(time.time()-timer)
-   
-    
-    
+    #print(time.time()-timer) 
+
     #delta_t = 1
     aax = float(kf.AAX(accx,accy,accz)) #x
     aaz = float(kf.AAZ(accx,accy,accz)) #z
@@ -271,6 +274,8 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
     #print("AAX AAY AAZ ", aax, aay, aaz)
     #print("Kalman orientation angles x y z", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360)
 
+    kalman.updateG()
+
     if(counter==25): #25 reading, should be half second
 	#print "Acceleration (x, y, z):", accx, accy, accz
 
@@ -295,6 +300,6 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
         print "Degree: %.2f" % com_deg2
 
         #print("AAX AAY AAZ ", aax, aay, aaz)
-	print"Kalman angles (X Pitch, y Roll, z Yaw)", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360)
+	print "Kalman angles (X Pitch, y Roll, z Yaw)", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360
 	counter=0
     #time.sleep(1)
