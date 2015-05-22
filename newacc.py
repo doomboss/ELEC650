@@ -79,6 +79,10 @@ def twos_comp_combine_acc(msb, lsb, bittranslation):
 
 def simple_distance(x,y):
     print ("helloworld")     
+def calculate_roll_acceleration(accx, accz):
+    return math.atan2(accx, accz)
+def calcilate_pitch_acceleration(accy, accz):
+    return math.atan2(accy, accz)
 
 #Control register addresses -- from LSM303D datasheet
 
@@ -150,10 +154,9 @@ else:
     b.write_byte_data(LSM, CTRL_5, 0b01100100) #high resolution mode, thermometer off, 6.25hz ODR
     b.write_byte_data(LSM, CTRL_6, 0b01000000) # set +/- 4 gauss full scale
     b.write_byte_data(LSM, CTRL_7, 0b00000000) #get magnetometer out of low power mode
-    b.write_byte_data(LSM_GYO, CTRL_1, 0b01101111) # normal mode with XYZ enable
+    b.write_byte_data(LSM_GYO, CTRL_1, 0b11111111) # normal mode with XYZ enable, 50HZ ODR 16.6HZ cutoff 
     b.write_byte_data(LSM_GYO, CTRL_4, 0b00000000) 
     b.write_byte_data(LSM_GYO, LOW_ODR, 0b00000000) 
-    #b.write_byte_data(LSM_GYO, CTRL_1, 0b00001111) 
     #b.write_byte_data(LSM_GYO, CTRL_1, 0b00001111) 
 
     counter=0
@@ -166,15 +169,15 @@ else:
 while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LSM_GYO, 0x0f) == LSM_WHOAMI_L3GD20H):
     
     #getting the initial value of accleration first
-    oaccx = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
-    oaccy = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
-    oaccz = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
+    #oaccx = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
+    #oaccy = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
+    #oaccz = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
 
     #timer = time.time()
     counter+=1
 
     while(time.time()-timer < DT/1000):
-        time.sleep(500*(1/1000000)) #sleep 0.5 ms until the total time is 20ms or more
+        time.sleep(0.0005) #sleep 0.5 ms until the total time is 20ms or more
    # delta_t = time.time()-timer
     
 
@@ -239,9 +242,9 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
 
     #complementary filter for the gyroscope
     #Current angle = 98% x (current angle + gyro rotation rate) + (2% * Accelerometer)
-    gyoxangle = 0.98*(gyoxangle+gyox*(DT/1000)) + 0.02*aax
-    gyoyangle = 0.98*(gyoyangle+gyoy*(DT/1000)) + 0.02*aay
-    gyozangle = 0.98*(gyozangle+gyoz*(DT/1000)) + 0.02*aaz
+    gyoxangle = 0.98*(gyoxangle+gyox) + 0.02*aax
+    gyoyangle = 0.98*(gyoyangle+gyoy) + 0.02*aay
+    gyozangle = 0.98*(gyozangle+gyoz) + 0.02*aaz
 
 #    temperature = twos_comp_combine(b.read_byte_data(LSM, TEMP_MSB), b.read_byte_data(LSM, TEMP_LSB))
 #    print "Temperature Reading: ", temperature
@@ -252,27 +255,46 @@ while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LS
 
     
 
-    if(counter==DT):
+
+    #displacement = velocity * DT + 0.5 * accx * DT * DT 
+    #print "displacement = ", displacement
+    #print "velocity = ", velocity
+    #print "Acceleration (x, y, z):", oaccx, oaccy, oaccz
+    #print "Acceleration (x, y, z):", accx, accy, accz
+    #print "DT:", DT
+    #print "Distance estimation in meter: ", math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))
+    #print "Time spent: ", time.time() - timer
+    #print "Gyroscope angle(x, y, z):", gyoxangle, gyoyangle, gyozangle
+    #print "Gyroscope rate(x, y, z):", gyox, gyoy, gyoz
+    #print "Magnetic field Raw Reading(x, y, z):", magx, magy, magz
+    #print "Degree: %.2f" % com_deg2
+    #print("AAX AAY AAZ ", aax, aay, aaz)
+    #print("Kalman orientation angles x y z", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360)
+
+    if(counter==25): #25 reading, should be half second
 	#print "Acceleration (x, y, z):", accx, accy, accz
 
 	#displacement = velocity * DT + 0.5 * accx * DT * DT 
-	velocity = math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))*DT
+	#velocity = math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))*DT
 
-	displacement = float(velocity * DT/1000 + 0.5 * math.sqrt(math.pow(accx*DT/1000,2)+math.pow(accy*DT/1000,2)+math.pow(accz*DT/1000,2)) * DT/1000 * DT/1000 )
+	#displacement = float(velocity * DT/1000 + 0.5 * math.sqrt(math.pow(accx*DT/1000,2)+math.pow(accy*DT/1000,2)+math.pow(accz*DT/1000,2)) * DT/1000 * DT/1000 )
 	#print "displacement = ", displacement
 	#print "velocity = ", velocity
 	#print "Acceleration (x, y, z):", oaccx, oaccy, oaccz
-	print "Acceleration (x, y, z):", accx, accy, accz
+	print "Acceleration without Calibration (x, y, z):", accx, accy, accz
+	acclist = [accx, accy, accz]
+	acclist = kf.removeG(acclist, kalman.getG())
+	print "Acceleration after Calibration (x, y, z):", acclist
 	#print "DT:", DT
         #print "Distance estimation in meter: ", math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))
 	#print "Time spent: ", time.time() - timer
-	#print "Gyroscope angle(x, y, z):", gyoxangle, gyoyangle, gyozangle
+	#print "Gyroscope angle without Calibration(x, y, z):", gyoxangle, gyoyangle, gyozangle
 	#print "Gyroscope rate(x, y, z):", gyox, gyoy, gyoz
 
 	#print "Magnetic field Raw Reading(x, y, z):", magx, magy, magz
         print "Degree: %.2f" % com_deg2
 
         #print("AAX AAY AAZ ", aax, aay, aaz)
-	print("Kalman angles ", KangleX,",", KangleY,",", KangleZ)
+	print"Kalman angles (X Pitch, y Roll, z Yaw)", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360)
 	counter=0
     #time.sleep(1)
