@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt #used for graphing
 import random #for creating noise
 import acc as newacc
 import curses
+import thread
+import xbeelib
 RAD_TO_DEG = 57.29578
+footstep_multiplier = 2
 
 class kalmanFilter:
 
@@ -27,7 +30,8 @@ class kalmanFilter:
 		self.gmag = float(0)
 		self.g = [0,0,0] #holds xyz of grav
 		self.timer_mark = float(int(round(time.time()*1000))) #get time at initialization in milliseconds (used only for graphs)
-		
+		self.xbeelib = xbeelib.xbee		
+
 	def setgmag(self, grav):
 		self.gmag = grav		
 		return #don't need to return anything
@@ -395,7 +399,8 @@ def mag_compass(magx, magy): #compass without pitch and roll using magnetometer
     	if (magy == 0 and magx > 0):
             return 0
 
-def main():
+def getdata():
+	xbee = xbeelib.xbee()
 	print("starting main")
     #start random num gen
 	newacc.init()
@@ -421,7 +426,9 @@ def main():
 
 	print("beginning main loop")
 	#print "X Acceleration\tY Acceleration\tZ Acceleration\tX Kalman\tY Kalman\tZ Kalman\tX Kalman Rounded\tY Kalman Rounded\tZ Kalman Rounded"
-	print "X Acceleration,X Kalman,X Kalman Rounded,Y Acceleration,Y Kalman,Y Kalman Rounded,Z Acceleration,Z Kalman,Z Kalman Rounded"
+	
+	#below are the header for printing the acceleration, comment out if printing footsteps
+	#print "X Acceleration,X Kalman,X Kalman Rounded,Y Acceleration,Y Kalman,Y Kalman Rounded,Z Acceleration,Z Kalman,Z Kalman Rounded"
 	acclist = [0,0,0,0,0,0,0,0,0]
 	i=0 #just for the loop
 	#curses.wrapper(pbar)
@@ -528,15 +535,26 @@ def main():
 		#curses.wrapper(pbar, acclist)
 		angle = mag_compass(newacc.get_mag_x(), newacc.get_mag_y())
 		now = datetime.now()
+
+		#instead of only measuring the Z axis, we use the length of vector to find the total acceleration in case the IMU is not only facing one direction
 		len_of_vector = float(math.sqrt(accx*accx+accy*accy+accz*accz))
 		len_of_vector_total += len_of_vector
 
-		if footstep_flag is False and len_of_vector > (len_of_vector_total / i * 2):
-			footstep_flag = True
+		#if the length of vector is larger than the average length of vector
+		if footstep_flag is False and len_of_vector > (len_of_vector_total / i * footstep_multiplier):
+			footstep_flag = True #set a flag that indicates footstep was counted
 			footstep += 1
-		elif footstep_flag is True and len_of_vector <= (len_of_vector_total / i * 2):
-			footstep_flag = False 
-		print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep) 
+			print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ)			
+			#uncomment this to use as xbee transmission
+			print 'attempting to send'
+			xbee.TX(str(angle)+"\t"+str(footstep)+";")
+			time.sleep(0.5)
+			print 'send finished'
+
+		elif footstep_flag is True and len_of_vector <= (len_of_vector_total / i * footstep_multiplier):
+			footstep_flag = False #removed the footstep flag for the next footstep detection
+
+		#print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ) 
 		#print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(zaverage/5)+ "\t"+str(angle)
 		zaverage = 0
 	print("end of main loop")
@@ -545,7 +563,8 @@ def main():
 	#plt.close("all")
 	#plt.ioff()
 		
-        
+def main():
+	thread.start_new_thread(getdata(), ())        
 
 if __name__=='__main__': main()
     

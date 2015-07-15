@@ -7,7 +7,7 @@
 #4. Connect the I2C device and detect it using the command "i2cdetect -y 1".  It should show up as 1D or 1E (here the variable LSM is set to 1D).
 
 #Driver by Fayetteville Free Library Robotics Group
-import kf1_7 as kf
+import kf2_0 as kf
 import math
 import time
 import datetime
