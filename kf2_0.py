@@ -3,12 +3,12 @@ import time #used for delta_t
 from datetime import datetime
 import matplotlib.pyplot as plt #used for graphing
 import random #for creating noise
-import acc as newacc
+import accxbee
 import curses
 import thread
 import xbeelib
 RAD_TO_DEG = 57.29578
-footstep_multiplier = 2
+footstep_multiplier = 2 #indicates the value that used for detecting the footstep 
 
 class kalmanFilter:
 
@@ -30,7 +30,9 @@ class kalmanFilter:
 		self.gmag = float(0)
 		self.g = [0,0,0] #holds xyz of grav
 		self.timer_mark = float(int(round(time.time()*1000))) #get time at initialization in milliseconds (used only for graphs)
-		self.xbeelib = xbeelib.xbee		
+		self.imulib = accxbee.imu #initialize the accxbee script and the imu class, for getting value from the IMU module
+		self.xbeelib = xbeelib.xbee(self.imulib) #initialize the xbeelib script and the xbee class, for the XBEE transmit and receive
+		#self.xbeelib.setIMU(self.imulib)
 
 	def setgmag(self, grav):
 		self.gmag = grav		
@@ -181,7 +183,7 @@ class kalmanFilter:
 
 def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	print("Begin calibration routine")
-	newacc.init()
+	
 	#start graph
 	
 	#plt.suptitle("calibration routine")
@@ -205,12 +207,14 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		#calculate delta_t
 		timer = float(round(time.time()*1000)) #get time before loop in milliseconds
 		
-		accx = newacc.get_acc_x()
-		accy = newacc.get_acc_y()
-		accz = newacc.get_acc_z()
-		gyox = newacc.get_gyo_x()
-		gyoy = newacc.get_gyo_x()
-		gyoz = newacc.get_gyo_x()
+		#use kf.imulib to access the accxbee.py for getting the imu data
+		#kf is KalmanFilter class
+		accx = kf.imulib.get_acc_x()
+		accy = kf.imulib.get_acc_y()
+		accz = kf.imulib.get_acc_z()
+		gyox = kf.imulib.get_gyo_x()
+		gyoy = kf.imulib.get_gyo_x()
+		gyoz = kf.imulib.get_gyo_x()
 		
 		#get angles
 		#update sensors()
@@ -400,22 +404,25 @@ def mag_compass(magx, magy): #compass without pitch and roll using magnetometer
             return 0
 
 def getdata():
-	xbee = xbeelib.xbee()
 	print("starting main")
-    #start random num gen
-	newacc.init()
+	#start random num gen
 	random.seed()
-	print "x", newacc.get_acc_x()
-	print "y", newacc.get_acc_y()
-	print "z", newacc.get_acc_z()	
 
 
 	#x = pitch, y = roll, z = heading
 
 	#initialize filter
-	kalmanfilter = kalmanFilter() #initialize the filter
-	#kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
+	kalmanfilter = kalmanFilter() #initialize the kalmanFilter class inside this script
+	imu = kalmanfilter.imulib #initializing the imu class in accxbee.py
+	xbee = kalmanfilter.xbeelib #initializing the xbee class in xbeelib.py
+	kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
 	
+        #print out the value just to check if the imu returns the correct value, which the Z value should be 1
+        print "x", imu.get_acc_x()
+        print "y", imu.get_acc_y()
+        print "z", imu.get_acc_z()
+
+
 	#graph initialize
 	#print("starting main graph")
 	#graph_init()
@@ -438,12 +445,12 @@ def getdata():
 	footstep_flag = False
 	len_of_vector_total = 0 #culmulate the length of vector to calculate the average value
 	while(True):
-		accx = newacc.get_acc_x()
-        	accy = newacc.get_acc_y()
-        	accz = newacc.get_acc_z()
-        	gyox = newacc.get_gyo_x()
-        	gyoy = newacc.get_gyo_y()
-        	gyoz = newacc.get_gyo_z()
+		accx = imu.get_acc_x()
+        	accy = imu.get_acc_y()
+        	accz = imu.get_acc_z()
+        	gyox = imu.get_gyo_x()
+        	gyoy = imu.get_gyo_y()
+        	gyoz = imu.get_gyo_z()
 
 
 		#print ("interval", i)
@@ -459,9 +466,9 @@ def getdata():
 
 		'''
 		#with random
-		gyox += newacc.get_gyo_x()
-		gyoy += newacc.get_gyo_y()
-		gyoz += newacc.get_gyo_z()
+		gyox += imu.get_gyo_x()
+		gyoy += imu.get_gyo_y()
+		gyoz += imu.get_gyo_z()
 		
 		accx = 2 + random.uniform(-0.1,0.1)
 		accy = 3 + random.uniform(-0.1,0.1)
@@ -548,7 +555,7 @@ def getdata():
 			#uncomment this to use as xbee transmission
 			print 'attempting to send'
 			xbee.TX(str(angle)+"\t"+str(footstep)+";")
-			time.sleep(0.5)
+			#time.sleep(0.5)
 			print 'send finished'
 
 		elif footstep_flag is True and len_of_vector <= (len_of_vector_total / i * footstep_multiplier):

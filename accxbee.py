@@ -24,10 +24,6 @@ gyozangle=0
 magtranslate=0.160 #+-4gauss
 G_GAIN = 0.00875
 
-kalman = kf.kalmanFilter()
-
-
-
 #acctranslate=2047.97 #value for 16g
 acctranslate=0.000244 #this is the mg/lsb we got from documentation
 #acctranslate=16383.8/(4*9.80665) #8g converted to m/s^2
@@ -68,14 +64,6 @@ def twos_comp_combine_acc(msb, lsb, bittranslation):
             return 0
         else:
             return tmp
-
-    #tmp = twos_comp/bittranslation
-    #if(math.abs(accx)<threshold):
-    #    accx=0
-    #if(math.abs(accy)<threshold):
-    #    accy=0
-    #if(math.abs(accz)<threshold):
-    #    accz=0
 
      
 def calculate_roll_acceleration(accx, accz):
@@ -147,192 +135,45 @@ else:
 #else:
 #    print 'Error detecting L3GD20H on bus ' +str(busNum)+'...   '
 
-def init():
-    b.write_byte_data(LSM, CTRL_1, 0b10000111) # enable accelerometer, 400 hz sampling
-    b.write_byte_data(LSM, CTRL_2, 0b01011000) #set +/- 2g full scale.  0x00 is 2g,0x04 should be 16g? ; 194hz anti-alias filter bandwidth
-    b.write_byte_data(LSM, CTRL_5, 0b01100100) #high resolution mode, thermometer off, 6.25hz ODR
-    b.write_byte_data(LSM, CTRL_6, 0b01000000) # set +/- 4 gauss full scale
-    b.write_byte_data(LSM, CTRL_7, 0b00000000) #get magnetometer out of low power mode
-    b.write_byte_data(LSM_GYO, CTRL_1, 0b11111111) # normal mode with XYZ enable, 50HZ ODR 16.6HZ cutoff 
-    b.write_byte_data(LSM_GYO, CTRL_4, 0b00000000) 
-    b.write_byte_data(LSM_GYO, LOW_ODR, 0b00000000) 
-    #b.write_byte_data(LSM_GYO, CTRL_1, 0b00001111) 
-    time.sleep(2)
+class imu:
+	def __init__():
+		b.write_byte_data(LSM, CTRL_1, 0b10000111) # enable accelerometer, 400 hz sampling
+		b.write_byte_data(LSM, CTRL_2, 0b01011000) #set +/- 2g full scale.  0x00 is 2g,0x04 should be 16g? ; 194hz anti-alias filter bandwidth
+		b.write_byte_data(LSM, CTRL_5, 0b01100100) #high resolution mode, thermometer off, 6.25hz ODR
+		b.write_byte_data(LSM, CTRL_6, 0b01000000) # set +/- 4 gauss full scale
+		b.write_byte_data(LSM, CTRL_7, 0b00000000) #get magnetometer out of low power mode
+		b.write_byte_data(LSM_GYO, CTRL_1, 0b11111111) # normal mode with XYZ enable, 50HZ ODR 16.6HZ cutoff 
+		b.write_byte_data(LSM_GYO, CTRL_4, 0b00000000) 
+		b.write_byte_data(LSM_GYO, LOW_ODR, 0b00000000)
+		time.sleep(2)
 
 
 
-def get_acc_all():
-    accdata = [twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)]
-    return accdata
-def get_gyo_all():
-    gyodata =  [G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))]
-    return gyodata
-#def get_mag_all():
-#    magdata = [magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))]
-#    return magdata
-
-def get_acc_x():
-    return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
-def get_acc_y():
-    return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
-def get_acc_z():
-    return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
-def get_gyo_x():
-    return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB))
-def get_gyo_y():
-    return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB))
-def get_gyo_z():
-    return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))
-def get_mag_x():
-    return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
-def get_mag_y():
-    return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
-def get_mag_z():
-    return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
-
-	
-def read_data():
-    counter=0
-
-    timer = time.time()
-
-    velocity = 0
-    displacement = 0
-
-    #calibrate the filter first
-
-    kalman = kf.calibrate_filter(kalman)
-
-    while (b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D and b.read_byte_data(LSM_GYO, 0x0f) == LSM_WHOAMI_L3GD20H):
-    
-    #getting the initial value of accleration first
-    #oaccx = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
-    #oaccy = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
-    #oaccz = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
-
-    #timer = time.time()
-        counter+=1
-
-        while(time.time()-timer < DT/1000):
-            time.sleep(0.0005) #sleep 0.5 ms until the total time is 20ms or more
-   # delta_t = time.time()-timer
-    
-
-    	gyox = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB))
-    	gyoy = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB))
-    	gyoz = G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))  
-  
-#    gyoxangle += gyox*DT/1000
-#    gyoyangle += gyoy*DT/1000
-#    gyozangle += gyoz*DT/1000
-    #print "Gyroscope (x, y, z):", gyox, gyoy, gyoz
-
-    	magx = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
-    	magy = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
-    	magz = magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
-
-    	#print "Magnetic field (x, y, z):", magx, magy, magz
-
-    	accx = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
-    	accy = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
-    	accz = twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
-
-    #print "Acceleration (x, y, z):", accx, accy, accz
-    #print "Distance estimation in meter: ", math.sqrt(math.pow(accx-oaccx,2)+math.pow(accy-oaccy,2))
-
-    #compass w/o pitch and roll
-    	if (magy > 0):
-            com_deg2 = (90-(math.degrees(math.atan(magx/magy))))
-    	if (magy < 0):
-            com_deg2 = (270-(math.degrees(math.atan(magx/magy))))
-    	if (magy ==  0 and magx < 0):
-            com_deg2 = 180
-    	if (magy == 0 and magx > 0):
-            com_deg2 = 0
-
-
-
-    #kalman filter from another python script!
-    #delta_t = timer - time.time()*1000.0
-    #aax = float(kf.AAX(accx,accy,accz)) #x
-    #aaz = float(kf.AAZ(accx,accy,accz)) #z
-    #aay = float(kf.AAY(accx,accy,accz)) #y
-    #KangleX = kalman.X(aax, gyox, delta_t) #gets calculated x
-    #KangleY = kalman.Y(aay, gyoy, delta_t) #gets calculated y
-    #KangleZ = kalman.Z(aaz, gyoz, delta_t) #gets calculated y
-    #print("Kalman angles " +KangleX+","+KangleY+","+KangleX)
-
-    #print(time.time()-timer) 
-
-    #delta_t = 1
-    	aax = float(kf.AAX(accx,accy,accz)) #x
-    	aaz = float(kf.AAZ(accx,accy,accz)) #z
-    	aay = float(kf.AAY(accx,accy,accz)) #y
-    	KangleX = kalman.X(aax, gyox, DT) #gets calculated x
-    	KangleY = kalman.Y(aay, gyoy, DT) #gets calculated y
-    	KangleZ = kalman.Z(aaz, gyoz, DT) #gets calculated z
-    #print("AAX AAY AAZ ", aax, aay, aaz)
-   # print("Kalman angles ", KangleX,",", KangleY,",", KangleZ)
-
-
-    #complementary filter for the gyroscope
-    #Current angle = 98% x (current angle + gyro rotation rate) + (2% * Accelerometer)
-    	gyoxangle = 0.98*(gyoxangle+gyox) + 0.02*aax
-    	gyoyangle = 0.98*(gyoyangle+gyoy) + 0.02*aay
-    	gyozangle = 0.98*(gyozangle+gyoz) + 0.02*aaz
-
-#    temperature = twos_comp_combine(b.read_byte_data(LSM, TEMP_MSB), b.read_byte_data(LSM, TEMP_LSB))
-#    print "Temperature Reading: ", temperature
-
-    #oaccx = accx
-    #oaccy = accy
-    #oaccz = accz
-
-    
-
-
-    #displacement = velocity * DT + 0.5 * accx * DT * DT 
-    #print "displacement = ", displacement
-    #print "velocity = ", velocity
-    #print "Acceleration (x, y, z):", oaccx, oaccy, oaccz
-    #print "Acceleration (x, y, z):", accx, accy, accz
-    #print "DT:", DT
-    #print "Distance estimation in meter: ", math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))
-    #print "Time spent: ", time.time() - timer
-    #print "Gyroscope angle(x, y, z):", gyoxangle, gyoyangle, gyozangle
-    #print "Gyroscope rate(x, y, z):", gyox, gyoy, gyoz
-    #print "Magnetic field Raw Reading(x, y, z):", magx, magy, magz
-    #print "Degree: %.2f" % com_deg2
-    #print("AAX AAY AAZ ", aax, aay, aaz)
-    #print("Kalman orientation angles x y z", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360)
-
-    	kalman.updateG()
-
-    	if(counter==25): #25 reading, should be half second
-    	    #print "Acceleration (x, y, z):", accx, accy, accz
-
-	    #displacement = velocity * DT + 0.5 * accx * DT * DT 
-	    #velocity = math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))*DT
-
-	#displacement = float(velocity * DT/1000 + 0.5 * math.sqrt(math.pow(accx*DT/1000,2)+math.pow(accy*DT/1000,2)+math.pow(accz*DT/1000,2)) * DT/1000 * DT/1000 )
-	#print "displacement = ", displacement
-	#print "velocity = ", velocity
-	#print "Acceleration (x, y, z):", oaccx, oaccy, oaccz
-	    print "Acceleration without Calibration (x, y, z):", accx, accy, accz
-	    acclist = [accx, accy, accz]
-	    acclist = kf.removeG(acclist, kalman.getG())
-	    print "Acceleration after Calibration (x, y, z):", acclist
-	#print "DT:", DT
-        #print "Distance estimation in meter: ", math.sqrt(math.pow((accx-oaccx)*DT,2)+math.pow((accy-oaccy)*DT,2))
-	#print "Time spent: ", time.time() - timer
-	#print "Gyroscope angle without Calibration(x, y, z):", gyoxangle, gyoyangle, gyozangle
-	#print "Gyroscope rate(x, y, z):", gyox, gyoy, gyoz
-
-	#print "Magnetic field Raw Reading(x, y, z):", magx, magy, magz
-            print "Degree: %.2f" % com_deg2
-
-        #print("AAX AAY AAZ ", aax, aay, aaz)
-	    print "Kalman angles (X Pitch, y Roll, z Yaw)", KangleX*RAD_TO_DEG%360,",", KangleY*RAD_TO_DEG%360,",", KangleZ*RAD_TO_DEG%360
-	    counter=0
-    #time.sleep(1)
+	def get_acc_all():
+		accdata = [twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)]
+		return accdata
+	def get_gyo_all():
+		gyodata =  [G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))]
+		return gyodata 	
+	#def get_mag_all():
+	#    	magdata = [magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))]
+	#    	return magdata
+	def get_acc_x():
+		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
+	def get_acc_y():
+		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
+	def get_acc_z():
+		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
+	def get_gyo_x():
+		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB))
+	def get_gyo_y():
+		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB))
+	def get_gyo_z():
+		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))
+	def get_mag_x():
+		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
+	def get_mag_y():
+		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
+	def get_mag_z():
+		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
 	
