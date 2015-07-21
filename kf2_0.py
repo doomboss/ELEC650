@@ -7,6 +7,7 @@ import accxbee
 import curses
 import thread
 import xbeelib
+import sys
 RAD_TO_DEG = 57.29578
 footstep_multiplier = 2 #indicates the value that used for detecting the footstep 
 
@@ -30,9 +31,9 @@ class kalmanFilter:
 		self.gmag = float(0)
 		self.g = [0,0,0] #holds xyz of grav
 		self.timer_mark = float(int(round(time.time()*1000))) #get time at initialization in milliseconds (used only for graphs)
-		self.imulib = accxbee.imu #initialize the accxbee script and the imu class, for getting value from the IMU module
-		self.xbeelib = xbeelib.xbee(self.imulib) #initialize the xbeelib script and the xbee class, for the XBEE transmit and receive
-		#self.xbeelib.setIMU(self.imulib)
+		self.imulib = accxbee.IMU() #initialize the accxbee script and the imu class, for getting value from the IMU module
+		self.xbeelib = xbeelib.XBEE(self.imulib) #initialize the xbeelib script and the xbee class, for the XBEE transmit and receive
+		#xbeelib.setIMU(imulib)
 
 	def setgmag(self, grav):
 		self.gmag = grav		
@@ -413,14 +414,17 @@ def getdata():
 
 	#initialize filter
 	kalmanfilter = kalmanFilter() #initialize the kalmanFilter class inside this script
+	
 	imu = kalmanfilter.imulib #initializing the imu class in accxbee.py
+	time.sleep(0.1)
 	xbee = kalmanfilter.xbeelib #initializing the xbee class in xbeelib.py
-	kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
+	time.sleep(0.1)
+	#kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
 	
         #print out the value just to check if the imu returns the correct value, which the Z value should be 1
-        print "x", imu.get_acc_x()
-        print "y", imu.get_acc_y()
-        print "z", imu.get_acc_z()
+        print "x:", imu.get_acc_x()
+        print "y:", imu.get_acc_y()
+        print "z:", imu.get_acc_z()
 
 
 	#graph initialize
@@ -444,6 +448,21 @@ def getdata():
 	footstep = 0
 	footstep_flag = False
 	len_of_vector_total = 0 #culmulate the length of vector to calculate the average value
+	
+	print 'starting the listener thread'
+	#thread.start_new_thread(xbee.RX(), ())
+	try:
+		thread.start_new_thread(xbee.RX(), ())
+		print 'thread started'
+	except KeyboardInterrupt as ki:
+		print 'keyboardinterrupt'
+		sys.exit()
+	except Exception as e:
+		print 'error starting the Receiving Thread!!!'
+		print e.args
+		print e
+		sys.exit()
+
 	while(True):
 		accx = imu.get_acc_x()
         	accy = imu.get_acc_y()
@@ -532,15 +551,18 @@ def getdata():
 		if ( (float(round(time.time()*1000)) - timer) < 20):
                 	#print float(round(time.time()*1000)) - timer, timer, float(round(time.time()*1000))
 			tmp = float(20 - (float(round(time.time()*1000)) - timer) )
-			#print tmp/1000 
+			#print tmp/1000
+			#print str((float(round(time.time()*1000)) - timer))
+			#print str(tmp/1000) 
 			time.sleep( tmp/1000 )
 			#time.sleep(0.02)
+		#print 'after the manual delay'
 		#curses.wrapper(pbar, acclist)
 		#print output
 		i+=1	#remove this eventually because FILTER IS ETERNAL BWAAHAHHAHWAH
 		#if i % 5 == 0:
 		#curses.wrapper(pbar, acclist)
-		angle = mag_compass(newacc.get_mag_x(), newacc.get_mag_y())
+		angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
 		now = datetime.now()
 
 		#instead of only measuring the Z axis, we use the length of vector to find the total acceleration in case the IMU is not only facing one direction
@@ -563,7 +585,6 @@ def getdata():
 
 		#print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ) 
 		#print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(zaverage/5)+ "\t"+str(angle)
-		zaverage = 0
 	print("end of main loop")
 	#time.sleep(10)
 	#print("closing main graph")

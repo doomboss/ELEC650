@@ -12,14 +12,6 @@ import math
 import time
 import datetime
 from smbus import SMBus
-busNum = 1
-b = SMBus(busNum)
-oaccx=0
-oaccy=0
-oaccz=0
-gyoxangle=0
-gyoyangle=0
-gyozangle=0
 
 magtranslate=0.160 #+-4gauss
 G_GAIN = 0.00875
@@ -125,18 +117,21 @@ IG_DURATION    = 0x38 # D20H
 
 LOW_ODR        = 0x39 # D20H
 
-if b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D:
-    print 'LSM303D detected successfully.'
-else:
-    print 'No LSM303D detected on bus '+str(busNum)+'.'
+busNum = 1
+b = SMBus(busNum)
 
-#if b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_L3GD20H:
-#    print 'L3GD20H detected successfully...'
-#else:
-#    print 'Error detecting L3GD20H on bus ' +str(busNum)+'...   '
+class IMU(object):
+	def __init__(self):
+		if b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_LSM303D:
+			print 'LSM303D detected successfully.'
+		else:
+   			print 'No LSM303D detected on bus '+str(busNum)+'.'
+			os.exit
+		#if b.read_byte_data(LSM, 0x0f) == LSM_WHOAMI_L3GD20H:
+		#    print 'L3GD20H detected successfully...'
+		#else:
+		#    print 'Error detecting L3GD20H on bus ' +str(busNum)+'...   '
 
-class imu:
-	def __init__():
 		b.write_byte_data(LSM, CTRL_1, 0b10000111) # enable accelerometer, 400 hz sampling
 		b.write_byte_data(LSM, CTRL_2, 0b01011000) #set +/- 2g full scale.  0x00 is 2g,0x04 should be 16g? ; 194hz anti-alias filter bandwidth
 		b.write_byte_data(LSM, CTRL_5, 0b01100100) #high resolution mode, thermometer off, 6.25hz ODR
@@ -145,35 +140,35 @@ class imu:
 		b.write_byte_data(LSM_GYO, CTRL_1, 0b11111111) # normal mode with XYZ enable, 50HZ ODR 16.6HZ cutoff 
 		b.write_byte_data(LSM_GYO, CTRL_4, 0b00000000) 
 		b.write_byte_data(LSM_GYO, LOW_ODR, 0b00000000)
-		time.sleep(2)
+		time.sleep(1)
 
 
 
-	def get_acc_all():
+	def get_acc_all(self):
 		accdata = [twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate), twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)]
 		return accdata
-	def get_gyo_all():
+	def get_gyo_all(self):
 		gyodata =  [G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))]
 		return gyodata 	
 	#def get_mag_all():
 	#    	magdata = [magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))]
 	#    	return magdata
-	def get_acc_x():
+	def get_acc_x(self):
 		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
-	def get_acc_y():
+	def get_acc_y(self):
 		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Y_MSB), b.read_byte_data(LSM, ACC_Y_LSB), acctranslate)
-	def get_acc_z():
+	def get_acc_z(self):
 		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_Z_MSB), b.read_byte_data(LSM, ACC_Z_LSB), acctranslate)
-	def get_gyo_x():
+	def get_gyo_x(self):
 		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB))
-	def get_gyo_y():
+	def get_gyo_y(self):
 		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB))
-	def get_gyo_z():
+	def get_gyo_z(self):
 		return G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))
-	def get_mag_x():
+	def get_mag_x(self):
 		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB))
-	def get_mag_y():
+	def get_mag_y(self):
 		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB))
-	def get_mag_z():
+	def get_mag_z(self):
 		return magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))
 	
