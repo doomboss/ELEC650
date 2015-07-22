@@ -1,11 +1,12 @@
 import serial, usb.core, usb.util, thread, time, sys, os
+from threading import Thread
 SERIALPORT = "/dev/ttyUSB" 
 BAUDRATE = 9600 
 DESTINATION = '\xFF\xFF' # Module 1: \x0A\xFB, Module 2: \x0A\xEF, All Modules: \xFF\xFF 
 
-class XBEE(object):
+class XBEE(Thread):
 	def __init__(self, imulib):
-		 
+		Thread.__init__(self) 
 		for x in range(0,10):
 			#print SERIALPORT+str(x)
 			#print os.path.exists("/dev/"+SERIALPORT+str(x))
@@ -14,7 +15,8 @@ class XBEE(object):
 				break
 		else:
 			print 'could not find the USB port associated with XBEE... Check connection please'
-			sys.exit()	
+			sys.exit()
+		self.daemon = True	
 		self.datalist = list()
 		time.sleep(0.1)
 		self.ser.write('\r\n\r\n\r\n\r\n')
@@ -23,13 +25,14 @@ class XBEE(object):
 		self.imulib = imulib
 		self.timeholder = 0
 		time.sleep(0.3)
+		self.start()
 
 	def setIMU(self, imulib):
 		self.imulib = imulib
 
 	#Buffer for receiving complete messages, messages should begin with the keyword 'START/' and end with the keyword '/END'. Everything sent that is not between these keywords will be filtered out. ser.write("\r\n\r\n\r\n\r\n")
 
-	def RX(self):
+	def run(self):
 		ser_rx = ""
 		while True:
 			try:

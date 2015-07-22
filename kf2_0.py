@@ -54,6 +54,21 @@ class kalmanFilter:
 		
 	def getG(self):
 		return self.g
+
+	def calcDistance(self, d, o, a, v, t):
+		#take acceleration and orientation
+		
+		#update velocity
+		v[0] = v[0]+(a[0]*t)/1000
+		v[1] = v[1]+(a[1]*t)/1000
+		v[2] = v[2]+(a[2]*t)/1000
+		
+		#update distance
+		d[0] = d[0] + (v[0]*t)/1000 + ((a[0]*t*t)/2)/(1000*1000)
+		d[1] = d[1] + (v[1]*t)/1000 + ((a[1]*t*t)/2)/(1000*1000)
+		d[2] = v[2] + (v[2]*t)/1000 + ((a[2]*t*t)/2)/(1000*1000)
+		
+		return  d, v
 	
     #Y filter call
 	#accAngle = angle measured with atan2 using the accelerometer
@@ -409,6 +424,8 @@ def getdata():
 	#start random num gen
 	random.seed()
 
+	velocity = [0,0,0]
+	distance = [0,0,0]
 
 	#x = pitch, y = roll, z = heading
 
@@ -452,7 +469,8 @@ def getdata():
 	print 'starting the listener thread'
 	#thread.start_new_thread(xbee.RX(), ())
 	try:
-		thread.start_new_thread(xbee.RX(), ())
+		#thread.start_new_thread(xbee.RX(), ())
+		#xbee.RX()
 		print 'thread started'
 	except Exception as e:
 		print 'error starting the Receiving Thread!!!'
@@ -469,6 +487,11 @@ def getdata():
         	gyoz = imu.get_gyo_z()
 
 
+		
+		timer_mark_loop = float(round(time.time()*1000))
+		timer_mark = kalmanfilter.getTimer_Mark() #get time before loop in milliseconds
+		time_since_start = int(round(time.time()*1000)) - timer_mark 
+		time_since_loop_start = float(round(time.time()*1000) - timer_mark_loop) #start of first loop
 		#print ("interval", i)
 		timer = int(round(time.time()*1000)) #get time before loop in milliseconds
 		delta_t = int(round(time.time()*1000)) - timer #calculates delta time since first loop
@@ -511,7 +534,8 @@ def getdata():
 		#delta_t = int(round(time.time()*1000)) - timer #dt
 		KangleZ = kalmanfilter.Z(aaz, gyoz, delta_t) #gets calculated y
 		#print("Kalman angles:       x-", KangleX," y-", KangleY," z-", KangleZ)
-		
+		orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
+
 		#calcuate accelerations
 		acceleration = [accx,accy,accz]#puts acceleration into a list
 		#print ("Actual  accel",acceleration)
@@ -543,13 +567,17 @@ def getdata():
 		
 		#print ("RemoveG accel", acceleration)
 		#print ( "%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2])
-		print ("Delta   T (ms)   ", delta_t, "S")
-		print ("Total   T (ms)   ", time_since_loop_start)
-		print ("Rounded A (g)    ", "%0.6f" % acceleration[0],"%0.6f" % acceleration[1],"%0.6f" % acceleration[2]) #just for our benefit
-		print ("Rounded V (g*s)  ", "%0.6f" % velocity[0],"%0.6f" % velocity[1],"%0.3f" % velocity[2])
-		print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])
-		print ("---")
 		
+		#uncomment this to print distance data
+		#print ("Delta   T (ms)   ", delta_t, "S")
+		#print ("Total   T (ms)   ", time_since_loop_start)
+		#print ("Rounded A (g)    ", "%0.6f" % acceleration[0],"%0.6f" % acceleration[1],"%0.6f" % acceleration[2]) #just for our benefit
+		#print ("Rounded V (g*s)  ", "%0.6f" % velocity[0],"%0.6f" % velocity[1],"%0.3f" % velocity[2])
+		#print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])
+		#print ("---")
+		
+
+
 		#print ("RemoveG accel", acceleration)
 		#print ("Rounded accel", "%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2]) #just for our benefit
 		#output = accx,accy,accz,acceleration[0],acceleration[1],acceleration[2],"%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2]
@@ -605,7 +633,8 @@ def getdata():
 			print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ)			
 			#uncomment this to use as xbee transmission
 			print 'attempting to send'
-			xbee.TX(str(angle)+"\t"+str(footstep)+";")
+			xbee.TX("pedometer:"+str(angle)+"\t"+str(footstep)+";")
+			xbee.TX("orientation:"+str(KangleX)+"\t"+str(KangleY)+"\t"+str(KangleZ)+";")
 			#time.sleep(0.5)
 			print 'send finished'
 
