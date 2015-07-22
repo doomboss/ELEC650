@@ -61,5 +61,6 @@ class XBEE(object):
 			self.ser.write(str(data))
 		except KeyboardInterrupt:
 			pass
+			sys.exit()
 		#except Exception as exception:
 			#print('Error_TX') print(exception.args) break
