@@ -518,6 +518,38 @@ def getdata():
 		#print "Get Gravity: ", kalmanfilter.getG()
 		kalmanfilter.updateG() #updates g using k angles stored in object
 		acceleration = removeG(acceleration, kalmanfilter.getG()) #fixes acceleration by removing gravity acceleration
+		
+				#round acceleration values
+		acceleration = [round(acceleration[0],2),round(acceleration[1],2),round(acceleration[2],2)]
+		
+		#calculate distance from acceleration - g
+		#distance calculations
+		distance, velocity = kalmanfilter.calcDistance(distance, orientation, acceleration, velocity, delta_t)
+		
+		#friction on the velocity, this is to help remove data error
+		if(acceleration[0] == 0): #if accel = 0 remove .5 of velocity
+			if(round(velocity[0],3) != 0):
+				velocity[0] = velocity[0] * 0.5
+				#velocity[0] = round(velocity[0],3) #can't have this rounded or velocity gets stuck at 0.001 at the end
+		if(acceleration[1] == 0): #if accel = 0 remove .5 of velocity
+			if(round(velocity[1],3) != 0):
+				velocity[1] = velocity[1] * 0.5
+		if(acceleration[2] == 0): #if accel = 0 remove .5 of velocity
+			if(round(velocity[2],3) != 0):
+				velocity[2] = velocity[2] * 0.5
+		
+		
+		
+		
+		#print ("RemoveG accel", acceleration)
+		#print ( "%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2])
+		print ("Delta   T (ms)   ", delta_t, "S")
+		print ("Total   T (ms)   ", time_since_loop_start)
+		print ("Rounded A (g)    ", "%0.6f" % acceleration[0],"%0.6f" % acceleration[1],"%0.6f" % acceleration[2]) #just for our benefit
+		print ("Rounded V (g*s)  ", "%0.6f" % velocity[0],"%0.6f" % velocity[1],"%0.3f" % velocity[2])
+		print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])
+		print ("---")
+		
 		#print ("RemoveG accel", acceleration)
 		#print ("Rounded accel", "%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2]) #just for our benefit
 		#output = accx,accy,accz,acceleration[0],acceleration[1],acceleration[2],"%0.3f" % acceleration[0],"%0.3f" % acceleration[1],"%0.3f" % acceleration[2]
