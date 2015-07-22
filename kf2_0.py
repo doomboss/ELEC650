@@ -454,9 +454,6 @@ def getdata():
 	try:
 		thread.start_new_thread(xbee.RX(), ())
 		print 'thread started'
-	except KeyboardInterrupt as ki:
-		print 'keyboardinterrupt'
-		sys.exit()
 	except Exception as e:
 		print 'error starting the Receiving Thread!!!'
 		print e.args
