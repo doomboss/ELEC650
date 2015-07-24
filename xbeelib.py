@@ -41,17 +41,19 @@ class XBEE(Thread):
 				if received == ";":
 					#print 'raw data: '+ser_rx
 					if ser_rx == "getacc":
-						self.TX(str(self.imulib.get_acc_all())+";")
+						#print 'getacc'
+						self.TX("acc:"+str(self.imulib.get_acc_x())+"\t"+str(self.imulib.get_acc_y())+"\t"+str(self.imulib.get_acc_z())+";")
 					elif ser_rx == "getgyo":
-						self.TX(str(self.imulib.get_gyo_all())+";")
+						#print 'getgyo'
+						self.TX("gyo:"+str(self.imulib.get_gyo_x())+"\t"+str(self.imulib.get_gyo_y())+"\t"+str(self.imulib.get_gyo_z())+";")
 					else:
 						print ser_rx
 					ser_rx = ""
-				elif received == "!": #start the timer
-					self.timeholder = time.time()
-				elif received == "?": #end the timer and calculate the time difference
-					print time.time() - self.timeholder
-					self.TX(time.time() - self.timeholder)
+				#elif received == "!": #start the timer
+				#	self.timeholder = time.time()
+				#elif received == "?": #end the timer and calculate the time difference
+				#	print time.time() - self.timeholder
+				#	self.TX(time.time() - self.timeholder)
 				else:
 					ser_rx += str(received)
 				#print(ser_rx) i=0 BUF_rx[:i] + ser_rx i+=1
