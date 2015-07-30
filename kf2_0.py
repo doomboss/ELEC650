@@ -66,7 +66,7 @@ class kalmanFilter:
 		#update distance
 		d[0] = d[0] + (v[0]*t)/1000 + ((a[0]*t*t)/2)/(1000*1000)
 		d[1] = d[1] + (v[1]*t)/1000 + ((a[1]*t*t)/2)/(1000*1000)
-		d[2] = v[2] + (v[2]*t)/1000 + ((a[2]*t*t)/2)/(1000*1000)
+		d[2] = d[2] + (v[2]*t)/1000 + ((a[2]*t*t)/2)/(1000*1000)
 		
 		return  d, v
 	
@@ -121,7 +121,7 @@ class kalmanFilter:
     #X filter call
 	def X(self, accAngle, gyroRate, looptime):
 		#correct the angle
-		accAngle = anglecorrection(accAngle)
+		#accAngle = anglecorrection(accAngle)
 	
 		DT = float(float(looptime)/1000)	
 	
@@ -153,7 +153,7 @@ class kalmanFilter:
 	#for z
 	def Z(self, accAngle, gyroRate, looptime):
 		#correct theangle
-		accAngle = anglecorrection(accAngle)
+		#accAngle = anglecorrection(accAngle)
 		
 		#turns milliseconds into seconds
 		DT = float(float(looptime)/1000)
@@ -269,7 +269,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		#delta_t = int(round(time.time()*1000)) - timer #dt
 		KangleY = kf.Y(aay, gyoy, delta_t) #gets calculated y
 		#delta_t = int(round(time.time()*1000)) - timer #dt
-		KangleZ = kf.Z(aaz, gyoz, delta_t) #gets calculated y
+		KangleZ = kf.Z(aaz, gyoz, delta_t) #gets calculated z
 		#print("Kalman angles:       x-", KangleX," y-", KangleY," z-", KangleZ)
 		
 		orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
@@ -301,8 +301,8 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	
 	#return the calibrated filter
 	print("sleeping")
-	time.sleep(3) #remove this later
-	print("clearing graph")
+	time.sleep(1) #remove this later
+	#print("clearing graph")
 	#plt.clf() #clears figure
 	return kf
 	
@@ -310,6 +310,9 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		
 	
 	
+def footstep_length(height): #height should be in meter
+	return height * 0.4
+
 #angle correction when it hits 180 (used in kf object)
 def anglecorrection(angle):
 	if angle >0:
@@ -320,7 +323,7 @@ def anglecorrection(angle):
 def calcMag(m):
 	return float(math.sqrt(m[0]*m[0]+m[1]*m[1]+m[2]*m[2]))
 
-def AAX(accx, accy, accz):
+def AAX(accx, accy, accz): 
 	return math.acos(accx/calcMag([accx,accy,accz])) 
 
 def AAZ(accx, accy, accz):
@@ -328,6 +331,24 @@ def AAZ(accx, accy, accz):
 
 def AAY(accx, accy, accz):
 	return math.acos(accy/calcMag([accx,accy,accz]))
+
+def pitch(accx, accy, accz):
+	return math.atan(accx/math.sqrt(accy*accy+accz*accz))
+
+def roll(accx, accy, accz):
+        return math.atan(accy/math.sqrt(accx*accx+accz*accz))
+
+def rad_to_angle(input):
+	tmp = math.degrees(input)
+	print 'input:'+(input)+'   tmp:'+str(tmp)
+	if tmp <= 360:
+		return tmp
+	elif tmp < 0 and tmp > -360:
+		return 360 + tmp
+	elif tmp < -360:
+		return math.fabs(tmp % -360)
+	else:
+		return tmp % 360
 
 #initialize the graph
 def graph_init():
@@ -419,6 +440,32 @@ def mag_compass(magx, magy): #compass without pitch and roll using magnetometer
     	if (magy == 0 and magx > 0):
             return 0
 
+def get_distance_xy(distance, angle):
+	#print 'distance: ' +str(distance)
+	if angle == 90:
+		return [0, distance]
+	elif angle == 180:
+		return [-distance, 0]
+	elif angle == 270:
+		return [0, -distance]
+	elif angle == 0:
+		return [distance, 0]
+	else:
+		if angle < 90 and angle > 0:
+			angle = math.radians(angle)
+			return [math.sin(angle)*distance, math.cos(angle)*distance]
+		elif angle < 180 and angle > 90:
+			#print 'larger than 90 less than 180'
+			angle = math.radians(180-angle)
+                        return [-(math.sin(angle)*distance), math.cos(angle)*distance]
+		elif angle < 270 and angle > 180:
+			angle = math.radians(270-angle)
+                        return [-(math.sin(angle)*distance), -(math.cos(angle)*distance)]
+		elif angle > 270: #angle larger than 270 but smaller than 360
+			angle = math.radians(360-angle)
+                        return [-(math.sin(angle)*distance), -(math.cos(angle)*distance)]
+
+
 def getdata():
 	print("starting main")
 	#start random num gen
@@ -436,7 +483,7 @@ def getdata():
 	time.sleep(0.1)
 	xbee = kalmanfilter.xbeelib #initializing the xbee class in xbeelib.py
 	time.sleep(0.1)
-	#kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
+	kalmanfilter = calibrate_filter(kalmanfilter) #should calibrate everything (takes aprox 15+ seconds)
 	
         #print out the value just to check if the imu returns the correct value, which the Z value should be 1
         print "x:", imu.get_acc_x()
@@ -466,18 +513,19 @@ def getdata():
 	footstep_flag = False
 	len_of_vector_total = 0 #culmulate the length of vector to calculate the average value
 	
-	print 'starting the listener thread'
+	#print 'starting the listener thread'
 	#thread.start_new_thread(xbee.RX(), ())
-	try:
+	#try:
 		#thread.start_new_thread(xbee.RX(), ())
 		#xbee.RX()
-		print 'thread started'
-	except Exception as e:
-		print 'error starting the Receiving Thread!!!'
-		print e.args
-		print e
-		sys.exit()
+	#	print 'thread started'
+	#except Exception as e:
+	#	print 'error starting the Receiving Thread!!!'
+	#	print e.args
+	#	print e
+	#	sys.exit()
 
+	print 'infinite while loop for displaying data begins'
 	while(True):
 		accx = imu.get_acc_x()
         	accy = imu.get_acc_y()
@@ -550,6 +598,9 @@ def getdata():
 		#distance calculations
 		distance, velocity = kalmanfilter.calcDistance(distance, orientation, acceleration, velocity, delta_t)
 		
+		#xbee.setDistance(distance)
+		angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
+		#xbee.setMagAngle(angle)
 		#friction on the velocity, this is to help remove data error
 		if(acceleration[0] == 0): #if accel = 0 remove .5 of velocity
 			if(round(velocity[0],3) != 0):
@@ -596,14 +647,12 @@ def getdata():
 		acclist[8]="%0.3f" % acceleration[2]
 		#print output
 		zaverage = zaverage + accz
-		#store orientation
-		orientation = [KangleX, KangleY, KangleZ]
+
 		#print ("kalman orientation", orientation)
 		#print( "accelerometer angles", acc2[2]*RAD_TO_DEG%360)
 		#print ("gyroscope angles")
 		#output_console(i, delta_t, time_since_start,gyox,gyoy,gyoz,aax,aay,aaz,KangleX,KangleY,KangleZ)
 		#graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
-		
 		#time.sleep(.5)  #delay
 		if ( (float(round(time.time()*1000)) - timer) < 20):
                 	#print float(round(time.time()*1000)) - timer, timer, float(round(time.time()*1000))
@@ -621,7 +670,7 @@ def getdata():
 		#curses.wrapper(pbar, acclist)
 		angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
 		now = datetime.now()
-
+		xbee.setAngle(angle)
 		#instead of only measuring the Z axis, we use the length of vector to find the total acceleration in case the IMU is not only facing one direction
 		len_of_vector = float(math.sqrt(accx*accx+accy*accy+accz*accz))
 		len_of_vector_total += len_of_vector
@@ -630,12 +679,22 @@ def getdata():
 		if footstep_flag is False and len_of_vector > (len_of_vector_total / i * footstep_multiplier):
 			footstep_flag = True #set a flag that indicates footstep was counted
 			footstep += 1
-			print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ)			
+			#print '%s:%s:%s:%s' % (now.hour, now.minute, now.second, now.microsecond) + "\t"+str(len_of_vector)+ "\t"+str(angle) + "\t" + str(footstep)+ "\t" + str(KangleX) + "\t" + str(KangleY) + "\t" + str(KangleZ)			
 			#uncomment this to use as xbee transmission
+
 			print 'attempting to send'
-			xbee.TX("pedometer:"+str(angle)+"\t"+str(footstep)+";")
-			xbee.TX("orientation:"+str(KangleX)+"\t"+str(KangleY)+"\t"+str(KangleZ)+";")
-			
+			#replace xbee.mag_angle with rad_to_angle(KangleZ) when using kalmanfilter
+			distance_xy = get_distance_xy(footstep_length(1.75), xbee.mag_angle) #first value is distance in meter, second is angle
+			#print str(distance_xy)
+			print 'step: '+str(footstep)
+			xbee.setDistanceStep(distance_xy)
+			print 'distance before summation'+str(distance_xy)+ "   "
+			print 'distance after summation'+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"
+			xbee.TX("pedometer:"+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"+str(rad_to_angle(KangleZ))+";")
+			#xbee.TX("orientation:"+str(KangleX)+"\t"+str(KangleY)+"\t"+str(KangleZ)+";")
+			print 'kalman orientation: '+str(rad_to_angle(KangleX))+'\t'+str(rad_to_angle(KangleY))+'\t'+str(rad_to_angle(KangleZ))
+			print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])	
+			#xbee.TX("mag_angle:"+str(rad_to_angle(KangleZ))+";")
 			#start the timer on the other end
 			#xbee.TX("!")
 			#xbee.TX("?")
