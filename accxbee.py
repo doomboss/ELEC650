@@ -134,7 +134,7 @@ class IMU(object):
 
 		b.write_byte_data(LSM, CTRL_1, 0b10000111) # enable accelerometer, 400 hz sampling
 		b.write_byte_data(LSM, CTRL_2, 0b01011000) #set +/- 2g full scale.  0x00 is 2g,0x04 should be 16g? ; 194hz anti-alias filter bandwidth
-		b.write_byte_data(LSM, CTRL_5, 0b01100100) #high resolution mode, thermometer off, 6.25hz ODR
+		b.write_byte_data(LSM, CTRL_5, 0b01110100) #high resolution mode, thermometer off, 6.25hz ODR
 		b.write_byte_data(LSM, CTRL_6, 0b01000000) # set +/- 4 gauss full scale
 		b.write_byte_data(LSM, CTRL_7, 0b00000000) #get magnetometer out of low power mode
 		b.write_byte_data(LSM_GYO, CTRL_1, 0b11111111) # normal mode with XYZ enable, 50HZ ODR 16.6HZ cutoff 
@@ -150,9 +150,9 @@ class IMU(object):
 	def get_gyo_all(self):
 		gyodata =  [G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_X_MSB), b.read_byte_data(LSM_GYO, GYO_X_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Y_MSB), b.read_byte_data(LSM_GYO, GYO_Y_LSB)), G_GAIN*twos_comp_combine(b.read_byte_data(LSM_GYO, GYO_Z_MSB), b.read_byte_data(LSM_GYO, GYO_Z_LSB))]
 		return gyodata 	
-	#def get_mag_all():
-	#    	magdata = [magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))]
-	#    	return magdata
+	def get_mag_all():
+	    	magdata = [magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_X_MSB), b.read_byte_data(LSM, MAG_X_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Y_MSB), b.read_byte_data(LSM, MAG_Y_LSB)), magtranslate*twos_comp_combine(b.read_byte_data(LSM, MAG_Z_MSB), b.read_byte_data(LSM, MAG_Z_LSB))]
+	    	return magdata
 	def get_acc_x(self):
 		return twos_comp_combine_acc(b.read_byte_data(LSM, ACC_X_MSB), b.read_byte_data(LSM, ACC_X_LSB), acctranslate)
 	def get_acc_y(self):

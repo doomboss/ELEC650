@@ -28,23 +28,31 @@ class kalmanFilter:
 		self.KFangleX = float(0.0)
 		self.KFangleY = float(0.0)
 		self.KFangleZ = float(0.0)
+		self.pitch = float(0)
+		self.roll = float(0)
 		self.gmag = float(0)
 		self.g = [0,0,0] #holds xyz of grav
 		self.timer_mark = float(int(round(time.time()*1000))) #get time at initialization in milliseconds (used only for graphs)
 		self.imulib = accxbee.IMU() #initialize the accxbee script and the imu class, for getting value from the IMU module
 		self.xbeelib = xbeelib.XBEE(self.imulib) #initialize the xbeelib script and the xbee class, for the XBEE transmit and receive
 		#xbeelib.setIMU(imulib)
+		self.magangle = 0 
 
 	def setgmag(self, grav):
 		self.gmag = grav		
-		return #don't need to return anything
 	
+	def setMagAngle(self, angle):
+		self.magangle = angle
+	def setPitch(self, angle):
+		self.pitch = angle
+	def setRoll(self, angle):
+		self.roll = angle
+
 	def updateG(self):
 		#sets the g array
 		self.g[0] = math.cos(self.KFangleX) * self.gmag
 		self.g[1] = math.cos(self.KFangleY) * self.gmag
 		self.g[2] = math.cos(self.KFangleZ) * self.gmag
-		return
 	
 	def getgmag(self):
 		return self.gmag
@@ -160,7 +168,7 @@ class kalmanFilter:
 	
 		##predict
 		#this predicts the current state (()calculates rate of angle change - bias) * time passed))
-		self.KFangleZ += + DT * (gyroRate - self.z_bias)
+		self.KFangleZ +=  DT * (gyroRate - self.z_bias)
 
 		#this is estimating the error covariance and puts it into a matrix, the important ones are 00 and 11
 		self.ZP_00 += - DT * (self.ZP_10 + self.ZP_01) + self.Q_angle * DT
@@ -213,7 +221,11 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	
 	acc = [0,0,0] #this is an average
 	orientation = [0,0,0]
+	magangle = 0 #angle calculated by using magnetometer
 	count = 0
+	#set the initial value with the reading from magnetometer
+	kf.KFangleZ = math.radians( mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y()) )
+	time.sleep(0.05)
 	
 	while (time_since_start < 20000): #stop after 7 seconds
 		#calculate time since start
@@ -229,8 +241,8 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		accy = kf.imulib.get_acc_y()
 		accz = kf.imulib.get_acc_z()
 		gyox = kf.imulib.get_gyo_x()
-		gyoy = kf.imulib.get_gyo_x()
-		gyoz = kf.imulib.get_gyo_x()
+		gyoy = kf.imulib.get_gyo_y()
+		gyoz = kf.imulib.get_gyo_z()
 		
 		#get angles
 		#update sensors()
@@ -239,13 +251,15 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		aaz = float(AAZ(accx,accy,accz)) #z
 		aay = float(AAY(accx,accy,accz)) #y
 		
+		#just a holder for the mag angle
+
 		#calculating alpha which is for averaging in the acceleration
 		while (float(round(time.time()*1000))- time_since_loop_start < 20):
 			#print "sleeping to meet 20ms DT"
 			time.sleep(.001) #we need a sleep here because otherwise the program runs too fast
 		#print float(round(time.time()*1000))- time_since_loop_start
 		
-		delta_t = float(round(time.time()*1000) - timer) #calculates delta time since start of a loop
+		#delta_t = float(round(time.time()*1000) - timer) #calculates delta time since start of a loop
 		'''
 		alpha = float(time_since_loop_start / (time_since_loop_start + delta_t)) #this calculates a ratio used for averaging over time
 
@@ -258,22 +272,28 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		acc[0] = acc[0]+accx
 		acc[1] = acc[1]+accy
 		acc[2] = acc[2]+accz
+
+		magangle =  magangle + mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y())
+
 		count+=1
 		
 		#print("accelerometer averages", acc)
 		
 		#print("accelerometer angle: x-",aax," y-",aay," z-",aaz) #for some reason if you comment out this code, everything dies
 
-		#delta_t = int(round(time.time()*1000)) - timer #reset dt each calculation
+		delta_t = int(round(time.time()*1000)) - timer #reset dt each calculation
+		#print ('delta_t:',delta_t)
 		KangleX = kf.X(aax, gyox, delta_t) #gets calculated x
 		#delta_t = int(round(time.time()*1000)) - timer #dt
 		KangleY = kf.Y(aay, gyoy, delta_t) #gets calculated y
 		#delta_t = int(round(time.time()*1000)) - timer #dt
-		KangleZ = kf.Z(aaz, gyoz, delta_t) #gets calculated z
+		KangleZ = kf.Z(math.radians( mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y())) , gyoz, delta_t)
+		#TODO: need to change the way the filter calculate Z axis 
+		#KangleZ = KangleZ + magangle
+		#KangleZ = kf.Z(aaz, gyoz, delta_t) #gets calculated z
 		#print("Kalman angles:       x-", KangleX," y-", KangleY," z-", KangleZ)
-		
-		orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
-		if ( (float(round(time.time()*1000)) - timer) < 20):
+		#orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
+		if float(round(time.time()*1000)) - timer < 20:
 			time.sleep( (20 - ( float(round(time.time()*1000)) - timer))/1000 )
 		#calibration graph
 		#graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
@@ -284,6 +304,8 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	acc[0]=acc[0]/count
 	acc[1]=acc[1]/count
 	acc[2]=acc[2]/count
+	#print 'magangle / count: '+str(magangle/count)
+	#kf.KFangleZ = math.radians(magangle / count)
 	
 	mag = calcMag(acc) #magnitude of gravity vector
 	kf.setgmag(mag) #set the kalman filter grav
@@ -293,6 +315,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	print("acceleration",acc)
 	print("acc-g",removeG(acc, kf.getG()))
 	'''
+	print 'orientation: '+str(math.degrees( kf.KFangleZ ))
 	print("gravity magnitude", kf.getgmag())
 	print("gravity removed", kf.getG())
 	print("end of calibration")
@@ -314,34 +337,87 @@ def footstep_length(height): #height should be in meter
 	return height * 0.4
 
 #angle correction when it hits 180 (used in kf object)
-def anglecorrection(angle):
-	if angle >0:
-		return (angle)
-	else:
-		return (180)	
-
+def anglecorrection(tmp):
+	if tmp <= 360 and tmp > 0:
+                return tmp
+        elif tmp < 0 and tmp > -360:
+                return 360 + tmp
+        elif tmp < -360:
+                return math.fabs(tmp % -360)
+        else:
+                return tmp % 360
 def calcMag(m):
 	return float(math.sqrt(m[0]*m[0]+m[1]*m[1]+m[2]*m[2]))
 
+#acceleration angle X
 def AAX(accx, accy, accz): 
 	return math.acos(accx/calcMag([accx,accy,accz])) 
-
+#Acceleration angle Z
 def AAZ(accx, accy, accz):
 	return math.acos(accz/calcMag([accx,accy,accz]))
-
+#Acceleration angle Y
 def AAY(accx, accy, accz):
 	return math.acos(accy/calcMag([accx,accy,accz]))
 
-def pitch(accx, accy, accz):
-	return math.atan(accx/math.sqrt(accy*accy+accz*accz))
+#need to verify
+#rotate along the X axis 
+def findPitch(accx, accy, accz):
+	den =  math.sqrt(accx*accx+accz*accz)
+	#print 'accx:'+str(accx) + '    math.sqrt(accy*accy+accz*accz):'+ str(den)
+	if den > 0:
+		return math.atan( accx / den)
+	else:
+		return 0
 
-def roll(accx, accy, accz):
-        return math.atan(accy/math.sqrt(accx*accx+accz*accz))
+	#return math.atan( accx/ math.sqrt(accy*accy+accz*accz) )
+#need to verify
+#rotate along the Y axis
+def findRoll(accx, accy, accz):
+	den = math.sqrt(accx*accx+accz*accz) #separate the denominator out so that the app doesnt need to do complex calculation multiple time
+	#print 'accy:'+str( accy) + '    math.sqrt(accx*accx+accz*accz):'+ str( den )
+	if den > 0:
+		return math.atan(accy / den)
+	else:
+		return 0
+        #return math.atan( accy/ math.sqrt(accx*accx+accz*accz) )
+
+def findHeading(roll, pitch, accx, accy, accz):
+	heading = 0
+	xheading = 0
+	yheading = 0
+	if roll==0 and pitch==0:
+		if not accx==0:
+			heading = math.atan( accy/accx )
+		else:
+			heading = 0
+	else:
+		xheading = accx * math.cos(pitch) + accy*math.sin(pitch)*math.sin(roll) - accz * math.sin(pitch)*math.cos(roll)
+		yheading = accy * math.cos(roll) - accz*math.sin(roll)
+		#print 'xheading:'+str(xheading) + '  yheading:'+str(yheading)
+		heading = math.degrees( math.atan( math.fabs(yheading) / math.fabs(xheading) )) if not xheading==0 else 0
+		if xheading < 0 and yheading > 0:
+			heading = 180 - math.degrees( heading )
+                elif xheading > 0 and yheading < 0:
+                        heading = 360 - math.degrees( heading )
+
+                elif xheading > 0 and yheading > 0:
+                        heading = math.degrees( heading )
+		elif xheading < 0 and yheading < 0:
+			heading = 270 - math.degrees( heading )
+                
+		elif xheading == 0 and yheading < 0:
+                        heading = 90
+
+                elif xheading == 0 and yheading > 0:
+                        heading = 270
+
+	return anglecorrection(heading) #this should be degree
+
 
 def rad_to_angle(input):
 	tmp = math.degrees(input)
-	print 'input:'+(input)+'   tmp:'+str(tmp)
-	if tmp <= 360:
+	#print 'input:'+str(input)+'   tmp:'+str(tmp)
+	if tmp <= 360 and tmp > 0:
 		return tmp
 	elif tmp < 0 and tmp > -360:
 		return 360 + tmp
@@ -431,13 +507,13 @@ def pbar(window, output):
 
 def mag_compass(magx, magy): #compass without pitch and roll using magnetometer
     #compass w/o pitch and roll
-    	if (magy > 0):
+    	if magy > 0:
             return (90-(math.degrees(math.atan(magx/magy))))
-    	if (magy < 0):
+    	if magy < 0:
             return (270-(math.degrees(math.atan(magx/magy))))
-    	if (magy ==  0 and magx < 0):
+    	if magy ==  0 and magx < 0:
             return 180
-    	if (magy == 0 and magx > 0):
+    	if magy == 0 and magx > 0:
             return 0
 
 def get_distance_xy(distance, angle):
@@ -473,7 +549,8 @@ def getdata():
 
 	velocity = [0,0,0]
 	distance = [0,0,0]
-
+	#pitch = 0
+	#roll = 0
 	#x = pitch, y = roll, z = heading
 
 	#initialize filter
@@ -508,7 +585,7 @@ def getdata():
 	i=0 #just for the loop
 	#curses.wrapper(pbar)
 	output = str()
-	zaverage = 0 
+	#zaverage = 0 
 	footstep = 0
 	footstep_flag = False
 	len_of_vector_total = 0 #culmulate the length of vector to calculate the average value
@@ -533,7 +610,9 @@ def getdata():
         	gyox = imu.get_gyo_x()
         	gyoy = imu.get_gyo_y()
         	gyoz = imu.get_gyo_z()
-
+		magx = imu.get_mag_x()
+		magy = imu.get_mag_y()
+		magz = imu.get_mag_z()
 
 		
 		timer_mark_loop = float(round(time.time()*1000))
@@ -542,8 +621,9 @@ def getdata():
 		time_since_loop_start = float(round(time.time()*1000) - timer_mark_loop) #start of first loop
 		#print ("interval", i)
 		timer = int(round(time.time()*1000)) #get time before loop in milliseconds
-		delta_t = int(round(time.time()*1000)) - timer #calculates delta time since first loop
-	
+		#delta_t = int(round(time.time()*1000)) - timer #calculates delta time since first loop
+		#put delta right before we need it
+		
 		#print("delta_t: ", delta_t, "time_since_start: ", time_since_start)
 
 
@@ -565,24 +645,29 @@ def getdata():
 		#without random
 		
 		#calculate time since start
-		time_since_start = int(round(time.time()*1000)) - timer_mark 
+		#time_since_start = int(round(time.time()*1000)) - timer_mark 
 		
-		#print("gyro angle:          x-",gyox," y-",gyoy," z-",gyoz)
 		aax = float(AAX(accx,accy,accz)) #x
 		aaz = float(AAZ(accx,accy,accz)) #z
 		aay = float(AAY(accx,accy,accz)) #y
+		kalmanfilter.setPitch ( findPitch(accx,accy,accz) )
+		kalmanfilter.setRoll( findRoll(accx,accy,accz) )
+		#print 'pitch:'+str(math.degrees(kalmanfilter.pitch))+"   roll:"+str(math.degrees(kalmanfilter.roll))+"   heading:"+str( findHeading(kalmanfilter.roll, kalmanfilter.pitch,magx , magy, magz) )
+		#current magetometer angle, use for comparison
+                angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
+
 		acc2 = [aax,aay,aaz]		
 		#calculate angles
 		#time.sleep(.001)
 		#print("accelerometer angle: x-",aax," y-",aay," z-",aaz) #for some reason if you comment out this code, everything dies
-		#delta_t = int(round(time.time()*1000)) - timer #reset dt each calculation
+		delta_t = int(round(time.time()*1000)) - timer #reset dt each calculation
 		KangleX = kalmanfilter.X(aax, gyox, delta_t) #gets calculated x
 		#delta_t = int(round(time.time()*1000)) - timer #dt
 		KangleY = kalmanfilter.Y(aay, gyoy, delta_t) #gets calculated y
 		#delta_t = int(round(time.time()*1000)) - timer #dt
-		KangleZ = kalmanfilter.Z(aaz, gyoz, delta_t) #gets calculated y
+		KangleZ = kalmanfilter.Z(math.radians(angle), gyoz, delta_t) #gets calculated z
 		#print("Kalman angles:       x-", KangleX," y-", KangleY," z-", KangleZ)
-		orientation = [KangleX, KangleY, KangleZ] #doesnt need to be average because the filter already does it
+		orientation = [rad_to_angle(KangleX), rad_to_angle(KangleY), rad_to_angle(KangleZ)] #doesnt need to be average because the filter already does it
 
 		#calcuate accelerations
 		acceleration = [accx,accy,accz]#puts acceleration into a list
@@ -599,7 +684,7 @@ def getdata():
 		distance, velocity = kalmanfilter.calcDistance(distance, orientation, acceleration, velocity, delta_t)
 		
 		#xbee.setDistance(distance)
-		angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
+		#angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
 		#xbee.setMagAngle(angle)
 		#friction on the velocity, this is to help remove data error
 		if(acceleration[0] == 0): #if accel = 0 remove .5 of velocity
@@ -646,11 +731,9 @@ def getdata():
 		acclist[7]=acceleration[2]
 		acclist[8]="%0.3f" % acceleration[2]
 		#print output
-		zaverage = zaverage + accz
 
-		#print ("kalman orientation", orientation)
+		#print ("kalman orientation: ", orientation)
 		#print( "accelerometer angles", acc2[2]*RAD_TO_DEG%360)
-		#print ("gyroscope angles")
 		#output_console(i, delta_t, time_since_start,gyox,gyoy,gyoz,aax,aay,aaz,KangleX,KangleY,KangleZ)
 		#graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
 		#time.sleep(.5)  #delay
@@ -668,9 +751,11 @@ def getdata():
 		i+=1	#remove this eventually because FILTER IS ETERNAL BWAAHAHHAHWAH
 		#if i % 5 == 0:
 		#curses.wrapper(pbar, acclist)
-		angle = mag_compass(imu.get_mag_x(), imu.get_mag_y())
-		now = datetime.now()
+		
+		#this will be replaced by the Kalman Z angle eventually		
+
 		xbee.setAngle(angle)
+		#print ('magnetometer orientation: ',angle )
 		#instead of only measuring the Z axis, we use the length of vector to find the total acceleration in case the IMU is not only facing one direction
 		len_of_vector = float(math.sqrt(accx*accx+accy*accy+accz*accz))
 		len_of_vector_total += len_of_vector
@@ -693,7 +778,7 @@ def getdata():
 			xbee.TX("pedometer:"+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"+str(rad_to_angle(KangleZ))+";")
 			#xbee.TX("orientation:"+str(KangleX)+"\t"+str(KangleY)+"\t"+str(KangleZ)+";")
 			print 'kalman orientation: '+str(rad_to_angle(KangleX))+'\t'+str(rad_to_angle(KangleY))+'\t'+str(rad_to_angle(KangleZ))
-			print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])	
+			#print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])	
 			#xbee.TX("mag_angle:"+str(rad_to_angle(KangleZ))+";")
 			#start the timer on the other end
 			#xbee.TX("!")
