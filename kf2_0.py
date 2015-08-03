@@ -190,7 +190,7 @@ class kalmanFilter:
 		##predict
 		#this predicts the current state (()calculates rate of angle change - bias) * time passed))
 		self.KFangleZ +=  DT * (gyroRate - self.z_bias)
-
+		self.KFangleZ = anglecorrection(self.KFangleZ)
 		#this is estimating the error covariance and puts it into a matrix, the important ones are 00 and 11
 		#self.ZP_00 += - DT * (self.ZP_10 + self.ZP_01) + self.Q_angle * DT
 		#self.ZP_01 += - DT * self.ZP_11
@@ -582,7 +582,7 @@ def get_distance_xy(distance, angle):
                         return [-(math.sin(angle)*distance), -(math.cos(angle)*distance)]
 		elif angle > 270: #angle larger than 270 but smaller than 360
 			angle = math.radians(360-angle)
-                        return [-(math.sin(angle)*distance), -(math.cos(angle)*distance)]
+                        return [ math.sin(angle)*distance , -(math.cos(angle)*distance)]
 
 
 def getdata():
@@ -778,11 +778,11 @@ def getdata():
 		total_heading += findHeading(kalmanfilter.roll, kalmanfilter.pitch, accx, accy, accz)
 		i+=1	#remove this eventually because FILTER IS ETERNAL BWAAHAHHAHWAH
 		if i % 5 == 0:
-			print ('gyro with calibration: ', gyoz)
-			print ('gyro angle: ',  gyoangle[2])
+			#print ('gyro with calibration: ', gyoz)
+			#print ('gyro angle: ',  gyoangle[2])
 			#print ('heading: ', findHeading(KangleX, KangleY, accx, accy, accz))
 			#print ('average heading: ', total_heading/5)
-			print ('KangleZ: ', KangleZ)
+			#print ('KangleZ: ', KangleZ)
 			total_heading = 0
 		#curses.wrapper(pbar, acclist)
 		
@@ -809,9 +809,9 @@ def getdata():
 			xbee.setDistanceStep(distance_xy)
 			print 'distance before summation'+str(distance_xy)+ "   "
 			print 'distance after summation'+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"
-			#xbee.TX("pedometer:"+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"+str(rad_to_angle(KangleZ))+";")
+			xbee.TX("pedometer:"+str(xbee.distance_step[0])+"\t"+str(xbee.distance_step[1])+"\t"+str(KangleZ)+";")
 			#xbee.TX("orientation:"+str(KangleX)+"\t"+str(KangleY)+"\t"+str(KangleZ)+";")
-			print 'kalman orientation: '+str(rad_to_angle(KangleX))+'\t'+str(rad_to_angle(KangleY))+'\t'+str(rad_to_angle(KangleZ))
+			#print 'kalman orientation: '+str(rad_to_angle(KangleX))+'\t'+str(rad_to_angle(KangleY))+'\t'+str(rad_to_angle(KangleZ))
 			#print ('mag heading: ', findHeading(kalmanfilter.roll, kalmanfilter.pitch,magx , magy, magz))
 			#print ('mag angle: ', xbee.mag_angle)
 			#print ("Rounded D (g*s^2)", "%0.6f" % distance[0],"%0.6f" % distance[1],"%0.6f" % distance[2])	
