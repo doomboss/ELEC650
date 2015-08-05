@@ -9,7 +9,9 @@ import thread
 import xbeelib
 import sys
 import numpy
-footstep_multiplier = 2.5 #indicates the length of vector multiply by this number, used for detecting the footstep 
+import ConfigParser
+
+footstep_multiplier = 2.1 #indicates the length of vector multiply by this number, used for detecting the footstep 
 
 class kalmanFilter:
 
@@ -40,7 +42,15 @@ class kalmanFilter:
 		self.xbeelib = xbeelib.XBEE(self.imulib) #initialize the xbeelib script and the xbee class, for the XBEE transmit and receive
 		#xbeelib.setIMU(imulib)
 		self.magangle = 0
-		self.delta_t = 0.02 
+		self.delta_t = 0.02
+		self.config = ConfigParser.ConfigParser() #for reading the .ini calibration data file later 		
+		self.magoffset = list()
+
+	def setMagOffset(self):
+		self.config.read("calibration.ini")
+		self.magoffset.append( (self.config.getfloat('Magnetometer', 'xmin') + self.config.getfloat('Magnetometer', 'xmax')) / 2 )
+		self.magoffset.append( (self.config.getfloat('Magnetometer', 'ymin') + self.config.getfloat('Magnetometer', 'ymax')) / 2 )
+		self.magoffset.append( (self.config.getfloat('Magnetometer', 'zmin') + self.config.getfloat('Magnetometer', 'zmax')) / 2 ) 
 
         def calibrateGyro(self, gyro):
                 if gyro[0]<self.gyo_max[0] and gyro[0] > self.gyo_min[0]:
@@ -82,7 +92,6 @@ class kalmanFilter:
 		
 	def getG(self):
 		return self.g
-
 	def calcDistance(self, d, o, a, v, t):
 		#take acceleration and orientation
 		
@@ -228,7 +237,7 @@ class kalmanFilter:
 
 def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	print("Begin calibration routine")
-	
+	kf.setMagOffset()
 	#start graph
 	
 	#plt.suptitle("calibration routine")
@@ -245,7 +254,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	magangle = 0 #angle calculated by using magnetometer
 	count = 0
 	#set the initial value with the reading from magnetometer
-	kf.KFangleZ = math.radians( mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y()) )
+	#kf.KFangleZ = math.radians( mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y()) )
 	#time.sleep(0.05)
 	
 	buffx = []
@@ -270,10 +279,10 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
         kf.gyo_mean[1] = numpy.mean(buffy)
         kf.gyo_max[2] = max(buffz)
         kf.gyo_mean[2] = numpy.mean(buffz)
+	
 
 
-
-	while (time_since_start < 20000): #stop after 7 seconds
+	while (time_since_start < 5000): #stop after 7 seconds
 		#calculate time since start
 		time_since_start = float(round(time.time()*1000) - timer_mark )
 		#time since loop start
@@ -315,7 +324,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		acc[1] = acc[1]+accy
 		acc[2] = acc[2]+accz
 
-		magangle =  magangle + mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y())
+		magangle =  magangle + mag_compass(kf.imulib.get_mag_x() - kf.magoffset[0] , kf.imulib.get_mag_y() - kf.magoffset[1])
 
 		count+=1
 		
@@ -330,7 +339,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 		#delta_t = int(round(time.time()*1000)) - timer #dt
 		KangleY = kf.Y(aay, gyoy, delta_t) #gets calculated y
 		#delta_t = int(round(time.time()*1000)) - timer #dt
-		KangleZ = kf.Z(math.radians( mag_compass(kf.imulib.get_mag_x() , kf.imulib.get_mag_y())) , gyoz, delta_t)
+		KangleZ = kf.Z(math.radians( mag_compass(kf.imulib.get_mag_x()-kf.magoffset[0] , kf.imulib.get_mag_y()-kf.magoffset[1])) , gyoz, delta_t)
 		#TODO: need to change the way the filter calculate Z axis 
 		#KangleZ = KangleZ + magangle
 		#KangleZ = kf.Z(aaz, gyoz, delta_t) #gets calculated z
@@ -348,7 +357,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	acc[1]=acc[1]/count
 	acc[2]=acc[2]/count
 	#print 'magangle / count: '+str(magangle/count)
-	#kf.KFangleZ = math.radians(magangle / count)
+	kf.KFangleZ = magangle / count
 	
 	mag = calcMag(acc) #magnitude of gravity vector
 	kf.setgmag(mag) #set the kalman filter grav
@@ -358,7 +367,7 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 	print("acceleration",acc)
 	print("acc-g",removeG(acc, kf.getG()))
 	'''
-	print 'orientation: '+str(math.degrees( kf.KFangleZ ))
+	print('orientation: '+str( kf.KFangleZ ))
 	print("gravity magnitude", kf.getgmag())
 	print("gravity removed", kf.getG())
 	print("end of calibration")
@@ -379,7 +388,6 @@ def calibrate_filter(kf):	#runs a 15 second calibration loop on the filter
 def footstep_length(height): #height should be in meter
 	return height * 0.4
 
-#angle correction when it hits 180 (used in kf object)
 def anglecorrection(tmp):
 	if tmp <= 360 and tmp > 0:
                 return tmp
@@ -391,6 +399,8 @@ def anglecorrection(tmp):
                 return tmp % 360
 def calcMag(m):
 	return float(math.sqrt(m[0]*m[0]+m[1]*m[1]+m[2]*m[2]))
+#def calcMag(m1,m2,m3):
+#	return float(math.sqrt(m1*m1+m2*m2+m3*m3))
 
 #acceleration angle X
 def AAX(accx, accy, accz): 
@@ -405,39 +415,30 @@ def AAY(accx, accy, accz):
 #need to verify
 #rotate along the X axis 
 def findPitch(accx, accy, accz):
-	den =  math.sqrt(accx*accx+accz*accz)
 	#print 'accx:'+str(accx) + '    math.sqrt(accy*accy+accz*accz):'+ str(den)
-	if den > 0:
-		return math.atan( accx / den)
-	else:
-		return 0
-
+	#return math.atan( accx / den)
+	return math.asin(accx / calcMag([accx, accy, accz])) #accXnorm
 	#return math.atan( accx/ math.sqrt(accy*accy+accz*accz) )
 #need to verify
 #rotate along the Y axis
-def findRoll(accx, accy, accz):
-	den = math.sqrt(accx*accx+accz*accz) #separate the denominator out so that the app doesnt need to do complex calculation multiple time
+def findRoll(accx, accy, accz, pitch):
+
 	#print 'accy:'+str( accy) + '    math.sqrt(accx*accx+accz*accz):'+ str( den )
-	if den > 0:
-		return math.atan(accy / den)
-	else:
-		return 0
+	#return math.atan(accy / den)
         #return math.atan( accy/ math.sqrt(accx*accx+accz*accz) )
+	return -math.asin(accy/calcMag([accx, accy, accz])/math.cos(pitch))#when the circuit is facing up, correct way, remove negative if circuit is facing down
 
 def findHeading(roll, pitch, accx, accy, accz):
 	heading = 0
 	xheading = 0
 	yheading = 0
 	if roll==0 and pitch==0:
-		if not accx==0:
-			heading = math.atan( accy/accx )
-		else:
-			heading = 0
+		heading = math.degrees( math.atan2( accy, accx ) )
 	else:
-		xheading = accx * math.cos(pitch) + accy*math.sin(pitch)*math.sin(roll) + accz * math.sin(pitch)*math.cos(roll)
-		yheading = accy * math.cos(roll) - accz*math.sin(roll)
+		yheading = accx * math.sin(roll)*math.sin(pitch) + accy*math.cos(roll) - accz * math.sin(roll) * math.cos(pitch)
+		xheading = accx * math.cos(pitch) - accz*math.sin(pitch)
 		#print 'xheading:'+str(xheading) + '  yheading:'+str(yheading)
-		heading = math.fabs (math.degrees( math.atan( -yheading / xheading ))) if not xheading==0 else 0
+		heading = math.degrees( math.atan2( yheading , xheading ))
 		#if xheading < 0 and yheading > 0: #negative heading angle, 2 quadrant
 		#	heading = 180 - heading
                 #elif xheading > 0 and yheading < 0:# negative heading angle, 4 quadrant
@@ -453,7 +454,8 @@ def findHeading(roll, pitch, accx, accy, accz):
 
                 #elif xheading == 0 and yheading > 0:
                 #        heading = 270
-
+	if heading < 0:
+		heading += 360
 	return heading #this should be degree
 
 
@@ -572,17 +574,17 @@ def get_distance_xy(distance, angle):
 	else:
 		if angle < 90 and angle > 0:
 			angle = math.radians(angle)
-			return [math.sin(angle)*distance, math.cos(angle)*distance]
+			return [math.cos(angle)*distance, math.sin(angle)*distance]
 		elif angle < 180 and angle > 90:
 			#print 'larger than 90 less than 180'
 			angle = math.radians(180-angle)
-                        return [-(math.sin(angle)*distance), math.cos(angle)*distance]
+                        return [-(math.cos(angle)*distance), math.sin(angle)*distance]
 		elif angle < 270 and angle > 180:
 			angle = math.radians(270-angle)
                         return [-(math.sin(angle)*distance), -(math.cos(angle)*distance)]
 		elif angle > 270: #angle larger than 270 but smaller than 360
 			angle = math.radians(360-angle)
-                        return [ math.sin(angle)*distance , -(math.cos(angle)*distance)]
+                        return [ math.cos(angle)*distance , -(math.sin(angle)*distance)]
 
 
 def getdata():
@@ -667,9 +669,9 @@ def getdata():
         	gyox = gyo[0]
         	gyoy = gyo[1]
         	gyoz = gyo[2]
-		magx = imu.get_mag_x()
-		magy = imu.get_mag_y()
-		magz = imu.get_mag_z()
+		magx = imu.get_mag_x() - kalmanfilter.magoffset[0]
+		magy = imu.get_mag_y() - kalmanfilter.magoffset[1]
+		magz = imu.get_mag_z() - kalmanfilter.magoffset[2]
 
 		
 		#print("delta_t: ", delta_t, "time_since_start: ", time_since_start)
@@ -685,7 +687,7 @@ def getdata():
 		aaz = float(AAZ(accx,accy,accz)) #z
 		aay = float(AAY(accx,accy,accz)) #y
 		kalmanfilter.setPitch ( findPitch(accx,accy,accz) )
-		kalmanfilter.setRoll( findRoll(accx,accy,accz) )
+		kalmanfilter.setRoll( findRoll(accx,accy,accz, kalmanfilter.pitch) )
 		#print 'pitch:'+str(math.degrees(kalmanfilter.pitch))+"   roll:"+str(math.degrees(kalmanfilter.roll))+"   heading:"+
 		#str( findHeading(kalmanfilter.roll, kalmanfilter.pitch,magx , magy, magz) )
 		#current magetometer angle, use for comparison
@@ -775,15 +777,16 @@ def getdata():
 		#print( "accelerometer angles", acc2[2]*RAD_TO_DEG%360)
 		#output_console(i, delta_t, time_since_start,gyox,gyoy,gyoz,aax,aay,aaz,KangleX,KangleY,KangleZ)
 		#graph_update(time_since_start, KangleX, gyox,aax,KangleY,gyoy,aay,KangleZ,gyoz,aaz)
-		total_heading += findHeading(kalmanfilter.roll, kalmanfilter.pitch, accx, accy, accz)
+		#total_heading += findHeading(kalmanfilter.roll, kalmanfilter.pitch, accx, accy, accz)
 		i+=1	#remove this eventually because FILTER IS ETERNAL BWAAHAHHAHWAH
 		if i % 5 == 0:
 			#print ('gyro with calibration: ', gyoz)
 			#print ('gyro angle: ',  gyoangle[2])
-			#print ('heading: ', findHeading(KangleX, KangleY, accx, accy, accz))
+			print ("heading:   ", findHeading(kalmanfilter.roll, kalmanfilter.pitch, accx, accy, accz))
+			print ("pitch      roll", math.degrees( kalmanfilter.pitch) , math.degrees( kalmanfilter.roll ))
 			#print ('average heading: ', total_heading/5)
-			#print ('KangleZ: ', KangleZ)
-			total_heading = 0
+			print ('KangleZ: ', KangleZ)
+			#total_heading = 0
 		#curses.wrapper(pbar, acclist)
 		
 		#this will be replaced by the Kalman Z angle eventually		

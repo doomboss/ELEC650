@@ -20,9 +20,11 @@ class XBEE(Thread):
 		self.datalist = list() #used as a data holder so that whenever we want to transmit something we can just set this value and use TX to transmit
 		time.sleep(0.1)
 		self.ser.write('\r\n\r\n\r\n\r\n')
+		self.ser.write(';')
 		time.sleep(0.3)
 		self.ser.write('B')
 		self.ser.write(';')
+		time.sleep(0.1)
 		self.imulib = imulib
 		self.distance = list()
 		self.velocity = list()
@@ -30,7 +32,7 @@ class XBEE(Thread):
 		self.distance_step = [0,0]
 		self.mag_angle = 0
 		self.timeholder = 0
-		time.sleep(0.3)
+		time.sleep(0.2)
 		self.start()
 
 	def setIMU(self, imulib):
@@ -75,6 +77,8 @@ class XBEE(Thread):
 						self.TX("mag_angle:"+str(self.mag_angle)+";")
 					elif ser_rx == "pedometer":
 						self.TX("pedometer:"+str(self.distance_step[0])+"\t"+str(self.distance_step[1])+"\t"+str(self.mag_angle)+";")
+					elif ser_rx == "reset":
+						self.distance_step = [0,0]
 					else:
 						print 'data stored: '+ser_rx
 					ser_rx = ""
